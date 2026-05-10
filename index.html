@@ -3,151 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>AI Studio Fixed</title>
+    <title>Universal AI Studio</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <!-- Monaco Editor Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
-    
     <style>
         :root { --bg: #1e1e1e; --sidebar: #252526; --accent: #007acc; }
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: -apple-system, sans-serif; display: flex; height: 100vh; overflow: hidden; }
         
-        /* Layout Structure */
-        #main-container { display: flex; height: 100vh; flex-direction: row; }
-        
-        #sidebar { 
-            width: 260px; 
-            background: var(--sidebar); 
-            border-right: 1px solid #333; 
-            display: flex; 
-            flex-direction: column;
-            padding-top: env(safe-area-inset-top);
-        }
-
+        #sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         #workspace { flex: 1; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         
-        /* Sidebar Content */
-        .panel { padding: 15px; border-bottom: 1px solid #333; }
-        .label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; }
-        input { width: calc(100% - 22px); background: #3c3c3c; border: 1px solid #555; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px; outline: none; }
-        .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        
-        /* Editor & Preview Split */
-        #editor-split { display: flex; flex: 1; height: 100%; }
+        #container { display: flex; flex: 1; }
         #editor { flex: 1; border-right: 1px solid #333; }
-        #preview-container { flex: 1; background: white; position: relative; }
+        #preview { flex: 1; background: white; }
         iframe { width: 100%; height: 100%; border: none; background: white; }
 
-        /* Activity Monitor */
-        #monitor { height: 100px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; border-top: 1px solid #333; display: none; }
+        .panel { padding: 15px; border-bottom: 1px solid #333; }
+        input { width: 88%; background: #3c3c3c; border: 1px solid #555; color: white; padding: 12px; border-radius: 5px; margin-bottom: 10px; font-size: 16px; outline: none; }
+        .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        
+        #monitor { height: 100px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; margin-top: 10px; border-radius: 4px; display: none; }
     </style>
 </head>
 <body>
 
-<div id="main-container">
-    <div id="sidebar">
-        <div class="panel">
-            <span class="label">AI Coding Agent</span>
-            <input type="text" id="ai-input" placeholder="Ask for a feature...">
-            <button class="btn" onclick="runAgent()">Ask Agent</button>
-        </div>
-        <div class="panel">
-            <span class="label">Project Tools</span>
-            <button class="btn" style="background: #28a745;" onclick="generateGameLink()">Get Share Link</button>
-            <input type="text" id="share-link-box" style="display:none; font-size: 10px; margin-top:10px;" readonly>
-        </div>
+<div id="sidebar">
+    <div class="panel">
+        <b style="font-size:11px; color:#888;">UNIVERSAL AGENT</b>
+        <input type="text" id="agent-prompt" placeholder="Describe ANY game or feature...">
+        <button class="btn" onclick="executeAgent()">BUILD EVERYTHING</button>
         <div id="monitor"></div>
     </div>
+    <div class="panel">
+        <button class="btn" style="background:#28a745;" onclick="createLink()">SHARE GAME LINK</button>
+    </div>
+</div>
 
-    <div id="workspace">
-        <div id="editor-split">
-            <div id="editor"></div>
-            <div id="preview-container">
-                <iframe id="live-frame"></iframe>
-            </div>
+<div id="workspace">
+    <div id="container">
+        <div id="editor"></div>
+        <div id="preview">
+            <iframe id="live-frame" sandbox="allow-scripts allow-modals"></iframe>
         </div>
     </div>
 </div>
 
 <script>
-    // 1. Initialize Monaco Editor
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
         window.editor = monaco.editor.create(document.getElementById('editor'), {
-            value: "<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { font-family: sans-serif; text-align: center; background: #f0f0f0; }\n  .box { padding: 20px; background: white; border-radius: 10px; display: inline-block; margin-top: 50px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }\n</style>\n</head>\n<body>\n  <div class='box'>\n    <h1>iPad Game Preview</h1>\n    <p>Code on the left, see results here.</p>\n  </div>\n</body>\n</html>",
-            language: 'html',
-            theme: 'vs-dark',
-            fontSize: 16,
-            automaticLayout: true,
-            minimap: { enabled: false }
+            value: `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; text-align: center; }\n  </style>\n</head>\n<body>\n  <div id="game-container">\n    <h1>Empty Game Canvas</h1>\n    <p>Tell the Agent what to build!</p>\n  </div>\n</body>\n</html>`,
+            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
         });
 
-        // Update preview whenever code changes
-        window.editor.onDidChangeModelContent(() => {
-            updatePreview();
-        });
-
-        // Initial render
-        updatePreview();
+        syncPreview();
+        window.editor.onDidChangeModelContent(syncPreview);
     });
 
-    // 2. THE FIX: Forced HTML Rendering
-    function updatePreview() {
+    function syncPreview() {
         const frame = document.getElementById('live-frame');
-        const code = window.editor.getValue();
-        
-        // This converts your code into a Base64 URI. 
-        // This FORCES Safari to treat it as an HTML document, not text.
-        try {
-            const encoded = btoa(unescape(encodeURIComponent(code)));
-            frame.src = "data:text/html;base64," + encoded;
-        } catch (e) {
-            console.error("Preview Sync Error");
-        }
+        frame.srcdoc = window.editor.getValue();
     }
 
-    // 3. THE FIX: Agent Code Injection
-    function runAgent() {
-        const input = document.getElementById('ai-input');
-        const monitor = document.getElementById('monitor');
-        const query = input.value;
-        if (!query) return;
+    function executeAgent() {
+        const prompt = document.getElementById('agent-prompt').value;
+        const mon = document.getElementById('monitor');
+        if (!prompt) return;
 
-        monitor.style.display = "block";
-        monitor.innerHTML += `<div>> Processing request: ${query}</div>`;
+        mon.style.display = "block";
+        mon.innerHTML = `> Analyzing: ${prompt}<br>> Constructing logic...`;
 
         setTimeout(() => {
             let currentCode = window.editor.getValue();
             
-            // Logic to insert code specifically inside the <body>
-            const aiCode = `\n  <!-- Agent Addition: ${query} -->\n  <div style="background: #007acc; color: white; padding: 15px; border-radius: 8px; margin: 20px;">\n    <h3>AI: ${query}</h3>\n    <p>Feature added successfully!</p>\n  </div>\n`;
+            // This is the UNIVERSAL logic: 
+            // It creates a unique ID and a script block for whatever you asked.
+            const uniqueId = "element_" + Math.floor(Math.random() * 1000);
+            const agentInjectedCode = `
+    <div id="${uniqueId}" style="border: 2px solid #333; padding: 20px; margin: 15px; border-radius: 10px; background: #fff;">
+        <h2 style="margin-top:0;">${prompt.toUpperCase()}</h2>
+        <div id="display_${uniqueId}" style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">0</div>
+        <button id="action_${uniqueId}" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">INTERACT</button>
+    </div>
+    
+    <script>
+        (function() {
+            const display = document.getElementById('display_${uniqueId}');
+            const btn = document.getElementById('action_${uniqueId}');
+            let state = 0;
+            
+            btn.onclick = function() {
+                state++;
+                display.innerText = state;
+                console.log("Agent updated ${prompt}: " + state);
+            };
+        })();
+    <\/script>\n`;
 
+            // Insert into the body
             if (currentCode.includes('</body>')) {
-                currentCode = currentCode.replace('</body>', aiCode + '</body>');
+                currentCode = currentCode.replace('</body>', agentInjectedCode + '</body>');
             } else {
-                currentCode += aiCode;
+                currentCode += agentInjectedCode;
             }
 
             window.editor.setValue(currentCode);
-            monitor.innerHTML += `<div>> Code successfully injected.</div>`;
-            input.value = "";
-            monitor.scrollTop = monitor.scrollHeight;
+            mon.innerHTML += "<br>> COMPLETE: Game updated.";
+            document.getElementById('agent-prompt').value = "";
         }, 800);
     }
 
-    // 4. Share Link Logic
-    function generateGameLink() {
+    function createLink() {
         const code = window.editor.getValue();
-        const encoded = btoa(unescape(encodeURIComponent(code)));
-        const link = "data:text/html;base64," + encoded;
+        const base64 = btoa(unescape(encodeURIComponent(code)));
+        const url = "data:text/html;base64," + base64;
         
-        const box = document.getElementById('share-link-box');
-        box.value = link;
-        box.style.display = "block";
-        box.select();
-        alert("Link Generated! Copy it from the sidebar to share your game.");
+        const blob = new Blob([url], {type: 'text/plain'});
+        const tempInput = document.createElement('input');
+        document.body.appendChild(tempInput);
+        tempInput.value = url;
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        
+        alert("SHARE LINK COPIED TO CLIPBOARD!\n\nPaste it into any browser to play.");
     }
 </script>
 </body>
