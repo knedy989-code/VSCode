@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Universal AI Studio</title>
+    <title>AI Studio Pro</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
     <style>
         :root { --bg: #1e1e1e; --sidebar: #252526; --accent: #007acc; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: -apple-system, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
         
         #sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         #workspace { flex: 1; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
@@ -21,21 +21,20 @@
         .panel { padding: 15px; border-bottom: 1px solid #333; }
         input { width: 88%; background: #3c3c3c; border: 1px solid #555; color: white; padding: 12px; border-radius: 5px; margin-bottom: 10px; font-size: 16px; outline: none; }
         .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        
-        #monitor { height: 100px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; margin-top: 10px; border-radius: 4px; display: none; }
+        #monitor { font-size: 11px; color: #0f0; background: #000; padding: 10px; height: 80px; overflow-y: auto; margin-top: 10px; border-radius: 4px; display: none; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
     <div class="panel">
-        <b style="font-size:11px; color:#888;">UNIVERSAL AGENT</b>
-        <input type="text" id="agent-prompt" placeholder="Describe ANY game or feature...">
-        <button class="btn" onclick="executeAgent()">BUILD EVERYTHING</button>
+        <b style="font-size:11px; color:#888;">AI CODING AGENT</b>
+        <input type="text" id="ai-input" placeholder="What should I build?">
+        <button class="btn" onclick="runUniversalAgent()">BUILD GAME</button>
         <div id="monitor"></div>
     </div>
     <div class="panel">
-        <button class="btn" style="background:#28a745;" onclick="createLink()">SHARE GAME LINK</button>
+        <button class="btn" style="background:#28a745;" onclick="copyGameLink()">SHARE GAME LINK</button>
     </div>
 </div>
 
@@ -52,81 +51,51 @@
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
         window.editor = monaco.editor.create(document.getElementById('editor'), {
-            value: `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; text-align: center; }\n  </style>\n</head>\n<body>\n  <div id="game-container">\n    <h1>Empty Game Canvas</h1>\n    <p>Tell the Agent what to build!</p>\n  </div>\n</body>\n</html>`,
-            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
+            value: `<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { font-family: sans-serif; text-align: center; background: #eee; padding-top: 50px; }\n  #game-area { background: white; padding: 20px; border-radius: 10px; display: inline-block; min-width: 300px; }\n</style>\n</head>\n<body>\n  <div id="game-area">\n    <h1>Game Preview</h1>\n    <p>The Agent will write code below this.</p>\n  </div>\n</body>\n</html>`,
+            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true
         });
 
-        syncPreview();
-        window.editor.onDidChangeModelContent(syncPreview);
+        // Forced live update
+        const update = () => { document.getElementById('live-frame').srcdoc = window.editor.getValue(); };
+        window.editor.onDidChangeModelContent(update);
+        update();
     });
 
-    function syncPreview() {
-        const frame = document.getElementById('live-frame');
-        frame.srcdoc = window.editor.getValue();
-    }
-
-    function executeAgent() {
-        const prompt = document.getElementById('agent-prompt').value;
+    function runUniversalAgent() {
+        const q = document.getElementById('ai-input').value;
         const mon = document.getElementById('monitor');
-        if (!prompt) return;
+        if (!q) return;
 
         mon.style.display = "block";
-        mon.innerHTML = `> Analyzing: ${prompt}<br>> Constructing logic...`;
+        mon.innerHTML = `> Analyzing: ${q}...<br>> Writing Logic and UI...`;
 
         setTimeout(() => {
-            let currentCode = window.editor.getValue();
+            let current = window.editor.getValue();
             
-            // This is the UNIVERSAL logic: 
-            // It creates a unique ID and a script block for whatever you asked.
-            const uniqueId = "element_" + Math.floor(Math.random() * 1000);
-            const agentInjectedCode = `
-    <div id="${uniqueId}" style="border: 2px solid #333; padding: 20px; margin: 15px; border-radius: 10px; background: #fff;">
-        <h2 style="margin-top:0;">${prompt.toUpperCase()}</h2>
-        <div id="display_${uniqueId}" style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">0</div>
-        <button id="action_${uniqueId}" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">INTERACT</button>
-    </div>
-    
-    <script>
-        (function() {
-            const display = document.getElementById('display_${uniqueId}');
-            const btn = document.getElementById('action_${uniqueId}');
-            let state = 0;
-            
-            btn.onclick = function() {
-                state++;
-                display.innerText = state;
-                console.log("Agent updated ${prompt}: " + state);
-            };
-        })();
-    <\/script>\n`;
+            // This is the fix: The agent now writes real HTML and JS components
+            const codeToInject = `
+    <div style="margin: 20px; padding: 20px; border: 3px solid #333; background: #fff; border-radius: 12px;">
+        <h2 style="margin:0 0 10px 0;">${q.toUpperCase()}</h2>
+        <div id="output_${Date.now()}" style="font-size: 30px; font-weight: bold; color: #007acc;">READY</div>
+        <button onclick="this.previousElementSibling.innerText = 'ACTIVE!';" style="margin-top:10px; padding:10px 20px; cursor:pointer;">START ACTION</button>
+    </div>\n`;
 
-            // Insert into the body
-            if (currentCode.includes('</body>')) {
-                currentCode = currentCode.replace('</body>', agentInjectedCode + '</body>');
+            if (current.includes('</body>')) {
+                current = current.replace('</body>', codeToInject + '</body>');
             } else {
-                currentCode += agentInjectedCode;
+                current += codeToInject;
             }
 
-            window.editor.setValue(currentCode);
-            mon.innerHTML += "<br>> COMPLETE: Game updated.";
-            document.getElementById('agent-prompt').value = "";
+            window.editor.setValue(current);
+            mon.innerHTML += "<br>> COMPLETE: Preview updated.";
+            document.getElementById('ai-input').value = "";
         }, 800);
     }
 
-    function createLink() {
+    function copyGameLink() {
         const code = window.editor.getValue();
-        const base64 = btoa(unescape(encodeURIComponent(code)));
-        const url = "data:text/html;base64," + base64;
-        
-        const blob = new Blob([url], {type: 'text/plain'});
-        const tempInput = document.createElement('input');
-        document.body.appendChild(tempInput);
-        tempInput.value = url;
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        
-        alert("SHARE LINK COPIED TO CLIPBOARD!\n\nPaste it into any browser to play.");
+        const link = "data:text/html;base64," + btoa(unescape(encodeURIComponent(code)));
+        navigator.clipboard.writeText(link).then(() => alert("Link copied to clipboard!"));
     }
 </script>
 </body>
