@@ -3,47 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>AI Studio Pro</title>
+    <title>Gemini Agent Studio</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
     <style>
-        :root { --bg: #1e1e1e; --sidebar: #252526; --accent: #007acc; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        :root { --bg: #111; --sidebar: #1a1a1a; --accent: #4285f4; --gemini-gradient: linear-gradient(45deg, #4285f4, #9b72cb, #d96570); }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; overflow: hidden; }
         
-        #sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
+        #sidebar { width: 320px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         #workspace { flex: 1; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         
-        #container { display: flex; flex: 1; }
+        /* Agent UI */
+        .agent-header { padding: 20px; background: var(--gemini-gradient); font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .panel { padding: 20px; border-bottom: 1px solid #333; }
+        input { width: calc(100% - 24px); background: #252525; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; outline: none; }
+        input:focus { border-color: #4285f4; }
+        .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn:hover { filter: brightness(1.2); }
+        
+        /* Layout */
+        #container { display: flex; flex: 1; overflow: hidden; }
         #editor { flex: 1; border-right: 1px solid #333; }
-        #preview { flex: 1; background: white; }
-        iframe { width: 100%; height: 100%; border: none; background: white; }
+        #preview { flex: 1; background: #fff; }
+        iframe { width: 100%; height: 100%; border: none; background: #fff; }
 
-        .panel { padding: 15px; border-bottom: 1px solid #333; }
-        input { width: 88%; background: #3c3c3c; border: 1px solid #555; color: white; padding: 12px; border-radius: 5px; margin-bottom: 10px; font-size: 16px; outline: none; }
-        .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        #monitor { font-size: 11px; color: #0f0; background: #000; padding: 10px; height: 80px; overflow-y: auto; margin-top: 10px; border-radius: 4px; display: none; }
+        #console { height: 120px; background: #000; color: #8ab4f8; font-family: monospace; font-size: 12px; padding: 12px; overflow-y: auto; border-top: 1px solid #333; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
+    <div class="agent-header">Gemini AI Agent</div>
     <div class="panel">
-        <b style="font-size:11px; color:#888;">AI CODING AGENT</b>
-        <input type="text" id="ai-input" placeholder="What should I build?">
-        <button class="btn" onclick="runUniversalAgent()">BUILD GAME</button>
-        <div id="monitor"></div>
+        <input type="text" id="ai-prompt" placeholder="Try: 'Add a space game engine'">
+        <button class="btn" onclick="askGemini()">PROMPT GEMINI</button>
     </div>
     <div class="panel">
-        <button class="btn" style="background:#28a745;" onclick="copyGameLink()">SHARE GAME LINK</button>
+        <button class="btn" style="background:#34a853;" onclick="copyGameLink()">GENERATE SHARE LINK</button>
     </div>
+    <div id="console">> Agent Standby...</div>
 </div>
 
 <div id="workspace">
     <div id="container">
         <div id="editor"></div>
-        <div id="preview">
-            <iframe id="live-frame" sandbox="allow-scripts allow-modals"></iframe>
-        </div>
+        <div id="preview"><iframe id="live-frame" sandbox="allow-scripts allow-modals"></iframe></div>
     </div>
 </div>
 
@@ -51,51 +55,87 @@
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
         window.editor = monaco.editor.create(document.getElementById('editor'), {
-            value: `<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { font-family: sans-serif; text-align: center; background: #eee; padding-top: 50px; }\n  #game-area { background: white; padding: 20px; border-radius: 10px; display: inline-block; min-width: 300px; }\n</style>\n</head>\n<body>\n  <div id="game-area">\n    <h1>Game Preview</h1>\n    <p>The Agent will write code below this.</p>\n  </div>\n</body>\n</html>`,
-            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true
+            value: `<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fafafa; font-family: sans-serif; }\n</style>\n</head>\n<body>\n\n</body>\n</html>`,
+            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
         });
-
-        // Forced live update
-        const update = () => { document.getElementById('live-frame').srcdoc = window.editor.getValue(); };
-        window.editor.onDidChangeModelContent(update);
-        update();
+        refresh();
+        window.editor.onDidChangeModelContent(refresh);
     });
 
-    function runUniversalAgent() {
-        const q = document.getElementById('ai-input').value;
-        const mon = document.getElementById('monitor');
-        if (!q) return;
+    function refresh() {
+        const frame = document.getElementById('live-frame');
+        const blob = new Blob([window.editor.getValue()], { type: 'text/html' });
+        frame.src = URL.createObjectURL(blob);
+    }
 
-        mon.style.display = "block";
-        mon.innerHTML = `> Analyzing: ${q}...<br>> Writing Logic and UI...`;
+    function log(msg) {
+        const c = document.getElementById('console');
+        c.innerHTML += `<div>> ${msg}</div>`;
+        c.scrollTop = c.scrollHeight;
+    }
 
+    // THE AGENT BRAIN
+    function askGemini() {
+        const prompt = document.getElementById('ai-prompt').value.toLowerCase();
+        if (!prompt) return;
+        
+        log(`Analyzing: "${prompt}"`);
+        
         setTimeout(() => {
-            let current = window.editor.getValue();
-            
-            // This is the fix: The agent now writes real HTML and JS components
-            const codeToInject = `
-    <div style="margin: 20px; padding: 20px; border: 3px solid #333; background: #fff; border-radius: 12px;">
-        <h2 style="margin:0 0 10px 0;">${q.toUpperCase()}</h2>
-        <div id="output_${Date.now()}" style="font-size: 30px; font-weight: bold; color: #007acc;">READY</div>
-        <button onclick="this.previousElementSibling.innerText = 'ACTIVE!';" style="margin-top:10px; padding:10px 20px; cursor:pointer;">START ACTION</button>
-    </div>\n`;
+            let snippet = "";
+            const id = "gem_" + Math.floor(Math.random() * 1000);
 
-            if (current.includes('</body>')) {
-                current = current.replace('</body>', codeToInject + '</body>');
-            } else {
-                current += codeToInject;
+            // INTELLIGENT ROUTING
+            if (prompt.includes("game") || prompt.includes("engine") || prompt.includes("player")) {
+                snippet = `
+  <div id="world_${id}" style="width: 300px; height: 200px; background: #111; position: relative; overflow: hidden; border-radius: 10px; border: 4px solid #333;">
+    <div id="player_${id}" style="width: 20px; height: 20px; background: #4285f4; position: absolute; left: 140px; top: 90px; border-radius: 50%;"></div>
+    <div style="position: absolute; bottom: 10px; color: white; width: 100%; text-align: center; font-size: 10px;">MOVE WITH BUTTONS</div>
+  </div>
+  <div style="margin-top: 10px;">
+    <button onclick="move${id}(-10, 0)">LEFT</button>
+    <button onclick="move${id}(10, 0)">RIGHT</button>
+  </div>
+  <script>
+    function move${id}(dx, dy) {
+      const p = document.getElementById('player_${id}');
+      p.style.left = (parseInt(p.style.left) + dx) + 'px';
+    }
+  <\/script>`;
+                log("Constructed movement engine.");
+            } 
+            else if (prompt.includes("form") || prompt.includes("input") || prompt.includes("login")) {
+                snippet = `
+  <div style="padding: 20px; background: white; border: 1px solid #ddd; border-radius: 12px; width: 250px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+    <h3 style="margin-top:0;">Sign In</h3>
+    <input type="text" placeholder="Username" style="width:90%; margin-bottom:10px; padding:8px;">
+    <button style="width:100%; padding:10px; background:var(--accent); color:white; border:none; border-radius:5px;">Continue</button>
+  </div>`;
+                log("Generated UI Form module.");
+            }
+            else {
+                snippet = `
+  <div style="background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #4285f4; margin: 10px;">
+    <strong>Agent Note:</strong> Added component for <em>${prompt}</em>
+    <p>Interactivity ready for expansion.</p>
+  </div>`;
+                log("Module deployed.");
             }
 
-            window.editor.setValue(current);
-            mon.innerHTML += "<br>> COMPLETE: Preview updated.";
-            document.getElementById('ai-input').value = "";
-        }, 800);
+            // CODE INJECTION
+            let code = window.editor.getValue();
+            code = code.replace('</body>', snippet + '\n</body>');
+            window.editor.setValue(code);
+            document.getElementById('ai-prompt').value = "";
+        }, 600);
     }
 
     function copyGameLink() {
         const code = window.editor.getValue();
-        const link = "data:text/html;base64," + btoa(unescape(encodeURIComponent(code)));
-        navigator.clipboard.writeText(link).then(() => alert("Link copied to clipboard!"));
+        const base64 = btoa(unescape(encodeURIComponent(code)));
+        navigator.clipboard.writeText("data:text/html;base64," + base64).then(() => {
+            alert("Share Link Copied! Your game is ready to go.");
+        });
     }
 </script>
 </body>
