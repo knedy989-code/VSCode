@@ -3,52 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>AI Studio</title>
-    
-    <!-- PWA Setup -->
+    <title>AI Studio Share</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906324.png">
-
-    <!-- Monaco Editor Loader -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
-    
     <style>
-        :root { --bg: #1e1e1e; --sidebar: #252526; --accent: #007acc; --term: #000; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: -apple-system, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        :root { --bg: #1e1e1e; --sidebar: #252526; --accent: #007acc; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
         
-        #activity-bar { width: 48px; background: #333; display: flex; flex-direction: column; align-items: center; padding-top: env(safe-area-inset-top); border-right: 1px solid #444; }
-        #ai-sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #333; }
-        #workspace { flex: 1; display: flex; flex-direction: column; position: relative; padding-top: env(safe-area-inset-top); }
+        #sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #333; padding-top: env(safe-area-inset-top); }
+        #workspace { flex: 1; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
         
         #container { display: flex; flex: 1; }
         #editor { flex: 1; border-right: 1px solid #333; }
         #preview { flex: 1; background: white; }
         iframe { width: 100%; height: 100%; border: none; }
 
-        #monitor { height: 120px; background: var(--term); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; border-top: 1px solid #444; display: none; }
+        .panel { padding: 15px; border-bottom: 1px solid #333; }
+        .label { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px; display: block; }
         
-        .icon { font-size: 20px; margin: 15px 0; cursor: pointer; }
-        #chat-history { flex: 1; overflow-y: auto; padding: 10px; font-size: 13px; }
-        #input-area { padding: 10px; border-top: 1px solid #333; display: flex; flex-direction: column; gap: 8px; }
-        input { background: #3c3c3c; border: none; color: white; padding: 10px; border-radius: 4px; outline: none; }
-        .btn { background: var(--accent); border: none; color: white; padding: 8px; border-radius: 4px; font-weight: bold; }
+        input { width: 90%; background: #3c3c3c; border: none; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+        .btn { width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        .share-area { background: #111; padding: 10px; border-radius: 5px; font-size: 10px; word-break: break-all; display: none; max-height: 100px; overflow-y: auto; color: #0f0; }
     </style>
 </head>
 <body>
 
-<div id="activity-bar">
-    <div class="icon">📁</div>
-    <div class="icon" onclick="toggleAI()">🤖</div>
-    <div class="icon" onclick="toggleMonitor()">📟</div>
-</div>
+<div id="sidebar">
+    <div class="panel">
+        <span class="label">AI Agent</span>
+        <input type="text" id="ai-q" placeholder="Describe a feature...">
+        <button class="btn" onclick="askAgent()">Build with AI</button>
+    </div>
 
-<div id="ai-sidebar" id="sidebar">
-    <div style="padding: 15px; font-size: 11px; opacity: 0.6;">AI AGENT ACTIVE</div>
-    <div id="chat-history"></div>
-    <div id="input-area">
-        <input type="text" id="ai-input" placeholder="Ask agent to code...">
-        <button class="btn" onclick="askAgent()">RUN AGENT</button>
+    <div class="panel">
+        <span class="label">Share & Publish</span>
+        <button class="btn" style="background: #28a745;" onclick="generateShareLink()">Generate Game Link</button>
+        <div id="share-output" class="share-area"></div>
+        <button id="copy-btn" class="btn" style="display:none; background:#555;" onclick="copyLink()">Copy to Clipboard</button>
     </div>
 </div>
 
@@ -57,74 +48,65 @@
         <div id="editor"></div>
         <div id="preview"><iframe id="live-frame"></iframe></div>
     </div>
-    <div id="monitor"><div id="logs"></div></div>
 </div>
 
 <script>
-    /* --- 1. INLINE SERVICE WORKER (OFFLINE) --- */
-    const swCode = `
-        const CACHE_NAME = 'ai-editor-v1';
-        const ASSETS = [
-            '/', 
-            'index.html',
-            'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js'
-        ];
-        self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS))));
-        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-    `;
-
-    const blob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(blob);
-
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register(swUrl).then(() => console.log("Offline Ready"));
-    }
-
-    /* --- 2. EDITOR LOGIC --- */
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
         window.editor = monaco.editor.create(document.getElementById('editor'), {
-            value: "<h1>iPad AI Studio</h1>\n<p>I work offline now!</p>",
-            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
+            value: "<!DOCTYPE html>\n<html>\n<body>\n <h1>My New Game</h1>\n <p>Use the Agent to help you build!</p>\n</body>\n</html>",
+            language: 'html', theme: 'vs-dark', fontSize: 16, automaticLayout: true
         });
         update();
         window.editor.onDidChangeModelContent(update);
     });
 
     function update() {
-        const doc = document.getElementById('live-frame').contentDocument;
-        doc.open(); doc.write(window.editor.getValue()); doc.close();
+        const frame = document.getElementById('live-frame');
+        const code = window.editor.getValue();
+        const blob = new Blob([code], { type: 'text/html' });
+        if (window.previewUrl) URL.revokeObjectURL(window.previewUrl);
+        window.previewUrl = URL.createObjectURL(blob);
+        frame.src = window.previewUrl;
     }
 
-    /* --- 3. AGENT LOGIC --- */
-    function toggleMonitor() {
-        const m = document.getElementById('monitor');
-        m.style.display = m.style.display === 'block' ? 'none' : 'block';
-    }
-
-    function addLog(txt) {
-        const l = document.getElementById('logs');
-        l.innerHTML += `<div>> ${txt}</div>`;
-        document.getElementById('monitor').scrollTop = l.scrollHeight;
-    }
-
+    // AI Agent Logic
     function askAgent() {
-        const input = document.getElementById('ai-input');
-        if (!input.value) return;
+        const q = document.getElementById('ai-q').value;
+        if (!q) return;
         
-        document.getElementById('monitor').style.display = 'block';
-        addLog("Agent starting: " + input.value);
+        let currentCode = window.editor.getValue();
+        // Generates a simple component based on request
+        const component = `\n  <div class="ai-build" style="padding:20px; margin:10px; border:2px solid ${['red','blue','green'][Math.floor(Math.random()*3)]}; border-radius:10px;">\n    <h3>AI: ${q}</h3>\n    <p>This was built by your iPad Agent.</p>\n  </div>\n`;
         
-        setTimeout(() => {
-            addLog("Scanning code structure...");
-            setTimeout(() => {
-                addLog("Injecting AI generated block...");
-                const code = window.editor.getValue() + "\n<!-- AI Generated Content -->\n<div style='color:blue'>New Agent Content</div>";
-                window.editor.setValue(code);
-                addLog("Done.");
-            }, 1000);
-        }, 500);
-        input.value = "";
+        if (currentCode.includes('</body>')) {
+            currentCode = currentCode.replace('</body>', component + '</body>');
+        } else {
+            currentCode += component;
+        }
+
+        window.editor.setValue(currentCode);
+        document.getElementById('ai-q').value = "";
+    }
+
+    // Share Logic
+    function generateShareLink() {
+        const code = window.editor.getValue();
+        // Convert code to Base64 to create a "Data URL"
+        const base64Code = btoa(unescape(encodeURIComponent(code)));
+        const shareLink = `data:text/html;base64,${base64Code}`;
+        
+        const output = document.getElementById('share-output');
+        output.innerText = shareLink;
+        output.style.display = 'block';
+        document.getElementById('copy-btn').style.display = 'block';
+    }
+
+    function copyLink() {
+        const text = document.getElementById('share-output').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Link copied! You can now paste this into a browser to play your game.");
+        });
     }
 </script>
 </body>
